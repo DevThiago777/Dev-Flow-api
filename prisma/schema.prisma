@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  in_progress
+  completed
+  on_hold
+}
+
+enum TransactionType {
+  earning
+  expense
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+}
+
+enum TicketStatus {
+  open
+  pending
+  closed
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  avatarUrl    String?
+  role         String   @default("member")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  projects       ProjectMember[]
+  ownedEvents    CalendarEvent[]  @relation("EventOwner")
+  attendingEvents CalendarEvent[] @relation("EventAttendees")
+  tickets        SupportTicket[]
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  company   String?
+  email     String?
+  phone     String?
+  avatarUrl String?
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+  invoices Invoice[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  subtitle    String?
+  icon        String        @default("folder")
+  color       String        @default("#3b82f6")
+  budget      Decimal       @default(0) @db.Decimal(12, 2)
+  deadline    DateTime?
+  status      ProjectStatus @default(in_progress)
+  progressPct Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  members ProjectMember[]
+  tasks   Task[]
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  title     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model CalendarEvent {
+  id        String   @id @default(cuid())
+  title     String
+  startAt   DateTime
+  endAt     DateTime
+  createdAt DateTime @default(now())
+
+  ownerId String
+  owner   User   @relation("EventOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  attendees User[] @relation("EventAttendees")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  type        TransactionType
+  amount      Decimal         @db.Decimal(12, 2)
+  description String
+  category    String?
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  number    String        @unique
+  amount    Decimal       @db.Decimal(12, 2)
+  status    InvoiceStatus @default(draft)
+  dueDate   DateTime
+  createdAt DateTime      @default(now())
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model SupportTicket {
+  id          String         @id @default(cuid())
+  subject     String
+  description String
+  status      TicketStatus   @default(open)
+  priority    TicketPriority @default(medium)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  requesterId String
+  requester   User   @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+}
